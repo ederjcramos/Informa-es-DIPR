@@ -1,88 +1,86 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-from datetime import datetime
 
 # CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="SISTEMA DIPR", page_icon="📝", layout="wide")
 
-# ESTILO CSS PARA O BRANCO INSTITUCIONAL E MENU LATERAL
+# CONEXÃO COM A PLANILHA (Usa os Secrets que você salvou)
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# ESTILO VISUAL (BRANCO INSTITUCIONAL)
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; }
     [data-testid="stSidebar"] { background-color: #F0F2F6; border-right: 1px solid #DCDFE3; }
     .header-bar {
-        background-color: #008080;
-        padding: 10px;
-        color: white;
-        text-align: center;
-        font-weight: bold;
-        border-radius: 5px;
-        margin-bottom: 20px;
+        background-color: #008080; padding: 10px; color: white;
+        text-align: center; font-weight: bold; border-radius: 5px; margin-bottom: 20px;
     }
-    label { color: #333333 !important; font-weight: bold !important; }
+    .stButton>button { width: 100%; }
     </style>
     <div class="header-bar">SISTEMA DE INFORMAÇÕES - DIPR</div>
     """, unsafe_allow_html=True)
 
-# --- BARRA LATERAL (NAVEGAÇÃO E COMPETÊNCIA) ---
+# --- MENU LATERAL ---
 with st.sidebar:
-    st.title("Menu de Navegação")
-    
-    # 1. ESCOLHA DA COMPETÊNCIA (Obrigatório)
-    st.subheader("Competência")
-    mes = st.selectbox("Mês:", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
-                                "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"])
-    ano = st.number_input("Ano:", min_value=2024, max_value=2030, value=2025)
+    st.title("Navegação")
+    mes = st.selectbox("Mês de Referência:", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"])
+    ano = st.selectbox("Ano:", [2024, 2025, 2026])
     
     st.divider()
-    
-    # 2. SELEÇÃO DA ABA
-    aba_selecionada = st.radio(
-        "Selecione a Categoria:",
-        ["Folha Mensal", "Folha 13º", "Unidade Gestora", "Parcelamentos"]
-    )
+    aba = st.radio("Selecione a Aba:", ["Folha Mensal", "Folha 13º", "Unidade Gestora", "Parcelamentos"])
 
-# --- ÁREA PRINCIPAL ---
-st.write(f"### Competência Atual: {mes} / {ano}")
-
-if aba_selecionada == "Folha Mensal":
-    st.subheader("📊 Lançamento de Folha Mensal")
+# --- LÓGICA DA ABA FOLHA MENSAL ---
+if aba == "Folha Mensal" or aba == "Folha 13º":
+    st.subheader(f"📊 {aba} - Competência {mes}/{ano}")
     
-    # Simulação de Centros de Custo já salvos
-    centros_salvos = ["Sec. de Saúde - Efetivos", "Sec. de Educação - Contratados", "Câmara Municipal"]
+    with st.expander("1. Identificação do Centro de Custo", expanded=True):
+        col_cc1, col_cc2 = st.columns(2)
+        with col_cc1:
+            centro_custo = st.text_input("Nome do Centro de Custo (Ex: Sec. Saúde):")
+        with col_cc2:
+            secretaria = st.selectbox("Vincular à Secretaria:", ["Saúde", "Educação", "Finanças", "Administração", "Assistência Social", "Câmara", "Outros"])
     
-    centro_escolhido = st.selectbox("Selecione um Centro de Custo existente ou crie um novo:", 
-                                    ["-- Criar Novo --"] + centros_salvos)
-    
-    if centro_escolhido == "-- Criar Novo --":
-        nome_novo = st.text_input("Nome do novo Centro de Custo:")
-        vinculo = st.selectbox("Vincular à Secretaria:", ["Saúde", "Educação", "Finanças", "Câmara", "Outros"])
-    else:
-        st.info(f"Editando: {centro_escolhido}")
+    with st.expander("2. Valores e Quantidades", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        qtd_serv = c1.number_input("Qtde Servidores:", min_value=0, step=1)
+        qtd_dep = c2.number_input("Qtde Dependentes:", min_value=0, step=1)
+        valor_bruto = c3.number_input("Valor Bruto (R$):", min_value=0.0, format="%.2f")
         
-    col1, col2 = st.columns(2)
-    with col1:
-        servidores = st.number_input("Qtde de Servidores:", min_value=0)
-        bruto = st.number_input("Valor Bruto Remuneração (R$):", min_value=0.0, format="%.2f")
-    with col2:
-        dependentes = st.number_input("Qtde de Dependentes:", min_value=0)
         base_calc = st.number_input("Base de Cálculo (R$):", min_value=0.0, format="%.2f")
 
-    # Lógica de Alíquota (Simulação)
-    aliquota_exemplo = 14.0  # Isso virá da base de usuários depois
-    valor_devido = base_calc * (aliquota_exemplo / 100)
+    # LÓGICA DE CÁLCULO (Simulando alíquotas - depois puxaremos da sua Base_Usuarios)
+    aliq_patronal = 14.0
+    aliq_servidor = 11.0
+    aliq_suplementar = 2.0
     
     if base_calc > 0:
-        st.warning(f"Contribuição Estimada ({aliquota_exemplo}%): R$ {valor_devido:,.2f}")
+        v_patronal = base_calc * (aliq_patronal / 100)
+        v_servidor = base_calc * (aliq_servidor / 100)
+        v_suplemen = base_calc * (aliq_suplementar / 100)
+        
+        st.info(f"**Cálculos Automáticos:** Patronal: R${v_patronal:,.2f} | Servidor: R${v_servidor:,.2f} | Suplementar: R${v_suplemen:,.2f}")
+        
+        pago = st.radio("Houve o pagamento?", ["Não", "Sim"], horizontal=True)
+        if pago == "Sim":
+            data_pagto = st.date_input("Data do Pagamento:")
+            st.success("Tudo pronto para salvar!")
 
-elif aba_selecionada == "Parcelamentos":
-    st.subheader("📜 Gestão de Parcelamentos")
-    st.write("Aqui o sistema listará os parcelamentos cadastrados para você apenas informar o pagamento.")
-    # Lista simulada
-    st.checkbox("Parcelamento 001/2023 - Termo de Acordo")
-    st.checkbox("Parcelamento 042/2024 - Déficit Atuarial")
+    if st.button("ENVIAR LANÇAMENTO"):
+        # Aqui criamos a linha para salvar
+        novo_dado = pd.DataFrame([{
+            "Mes": mes, "Ano": ano, "Centro_Custo": centro_custo, "Secretaria": secretaria,
+            "Valor_Bruto": valor_bruto, "Base_Calculo": base_calc, "Tipo": aba
+        }])
+        
+        # COMANDO MÁGICO: Envia para a planilha
+        try:
+            conn.create(worksheet="Lançamentos_Mensais", data=novo_dado)
+            st.balloons()
+            st.success("Dados gravados na Planilha Google com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao salvar: Verifique se o nome da aba na planilha é 'Lançamentos_Mensais'")
 
-# BOTÃO DE SALVAR FINAL
-st.markdown("---")
-if st.button("SALVAR TODAS AS INFORMAÇÕES"):
-    st.success(f"Dados salvos com sucesso para a competência {mes}/{ano}!")
+else:
+    st.info("Aba em desenvolvimento conforme o seu modelo.")
