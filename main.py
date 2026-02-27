@@ -68,24 +68,24 @@ if aba == "Folha Mensal" or aba == "Folha 13º":
             st.success("Tudo pronto para salvar!")
 
     if st.button("ENVIAR LANÇAMENTO"):
-        # Criamos os dados
         dados_lista = [[mes, ano, centro_custo, secretaria, valor_bruto, base_calc, aba]]
         colunas = ["Mes", "Ano", "Centro_Custo", "Secretaria", "Valor_Bruto", "Base_Calculo", "Tipo"]
         novo_df = pd.DataFrame(dados_lista, columns=colunas)
         
+        # COLE O LINK DA SUA PLANILHA AQUI ABAIXO
+        url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4IqA5itXB0G-MRB35aGGU/edit?gid=0#gid=0"
+        
         try:
-            # Lendo os dados existentes primeiro para anexar (Append)
-            existentes = conn.read(worksheet="Lançamentos_Mensais")
+            # Conecta usando o link direto para não ter erro de "None"
+            existentes = conn.read(spreadsheet=url_planilha, worksheet="Lançamentos_Mensais")
             updated_df = pd.concat([existentes, novo_df], ignore_index=True)
             
-            # Atualiza a planilha inteira
-            conn.update(worksheet="Lançamentos_Mensais", data=updated_df)
+            conn.update(spreadsheet=url_planilha, worksheet="Lançamentos_Mensais", data=updated_df)
             
             st.balloons()
             st.success("✅ Dados gravados com sucesso!")
         except Exception as e:
-            st.error(f"Erro técnico: {e}")
-            st.info("DICA: Verifique se o e-mail do robô está como EDITOR na planilha.")
+            st.error(f"Erro técnico detalhado: {e}")
 
 else:
     st.info("Aba em desenvolvimento conforme o seu modelo.")
