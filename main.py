@@ -68,19 +68,24 @@ if aba == "Folha Mensal" or aba == "Folha 13º":
             st.success("Tudo pronto para salvar!")
 
     if st.button("ENVIAR LANÇAMENTO"):
-        # Aqui criamos a linha para salvar
-        novo_dado = pd.DataFrame([{
-            "Mes": mes, "Ano": ano, "Centro_Custo": centro_custo, "Secretaria": secretaria,
-            "Valor_Bruto": valor_bruto, "Base_Calculo": base_calc, "Tipo": aba
-        }])
+        # Criamos os dados
+        dados_lista = [[mes, ano, centro_custo, secretaria, valor_bruto, base_calc, aba]]
+        colunas = ["Mes", "Ano", "Centro_Custo", "Secretaria", "Valor_Bruto", "Base_Calculo", "Tipo"]
+        novo_df = pd.DataFrame(dados_lista, columns=colunas)
         
-        # COMANDO MÁGICO: Envia para a planilha
         try:
-            conn.create(worksheet="Lançamentos_Mensais", data=novo_dado)
+            # Lendo os dados existentes primeiro para anexar (Append)
+            existentes = conn.read(worksheet="Lançamentos_Mensais")
+            updated_df = pd.concat([existentes, novo_df], ignore_index=True)
+            
+            # Atualiza a planilha inteira
+            conn.update(worksheet="Lançamentos_Mensais", data=updated_df)
+            
             st.balloons()
-            st.success("Dados gravados na Planilha Google com sucesso!")
+            st.success("✅ Dados gravados com sucesso!")
         except Exception as e:
-            st.error(f"Erro ao salvar: Verifique se o nome da aba na planilha é 'Lançamentos_Mensais'")
+            st.error(f"Erro técnico: {e}")
+            st.info("DICA: Verifique se o e-mail do robô está como EDITOR na planilha.")
 
 else:
     st.info("Aba em desenvolvimento conforme o seu modelo.")
