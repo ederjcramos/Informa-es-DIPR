@@ -144,7 +144,7 @@ if not st.session_state.competencia_confirmada:
 
     with st.container(border=True):
 
-        st.markdown("### Selecione o período de trabalho:")
+        st.markdown("### Selecione a competência para preenchimento:")
         c1, c2 = st.columns(2)
 
         lista_meses = [
