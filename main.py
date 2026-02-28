@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
-# 1. CONFIGURAÇÃO E ESTILO
+# 1. CONFIGURAÇÃO DE PÁGINA
 st.set_page_config(page_title="SISTEMA DIPR 2026", layout="wide")
 
-# Conexão com a Planilha
+# Conexão com Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4IqA5itXB0G-MRB35aGGU/edit?gid=0#gid=0"
 
@@ -13,12 +13,14 @@ url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4I
 def carregar_aba(nome_aba):
     try:
         return conn.read(spreadsheet=url_planilha, worksheet=nome_aba)
-    except Exception as e:
+    except Exception:
         return pd.DataFrame()
 
-# --- CONTROLE DE SESSÃO ---
-if 'logado' not in st.session_state: st.session_state.logado = False
-if 'competencia_confirmada' not in st.session_state: st.session_state.competencia_confirmada = False
+# --- ESTADO DA SESSÃO ---
+if 'logado' not in st.session_state: 
+    st.session_state.logado = False
+if 'competencia_confirmada' not in st.session_state: 
+    st.session_state.competencia_confirmada = False
 
 # --- TELA 01: LOGIN ---
 if not st.session_state.logado:
@@ -31,9 +33,10 @@ if not st.session_state.logado:
         if st.form_submit_button("Entrar no Sistema"):
             df_user = carregar_aba("Base_Usuários")
             if not df_user.empty:
-                # Limpeza para comparação segura de CPF (remove pontos e traços se houver)
+                # Limpa CPF para comparação
                 u_cpf_limpo = u_cpf.replace('.', '').replace('-', '')
                 
+                # Filtra usuário
                 user_match = df_user[
                     (df_user['Email'].str.lower() == u_email.lower()) & 
                     (df_user['Senha'].astype(str) == u_senha) & 
@@ -46,12 +49,12 @@ if not st.session_state.logado:
                     st.session_state.usuario_nome = u_email.split('@').capitalize()
                     st.rerun()
                 else:
-                    st.error("⚠️ Dados de acesso incorretos. Verifique e-mail, senha e CPF.")
+                    st.error("⚠️ Dados incorretos. Verifique e-mail, senha e CPF.")
             else:
-                st.error("Erro ao carregar base de usuários. Verifique a conexão com a planilha.")
+                st.error("❌ Erro ao conectar com a planilha. Verifique o link.")
     st.stop()
 
-# --- TELA 02: SELEÇÃO DE COMPETÊNCIA (TRAVA) ---
+# --- TELA 02: SELEÇÃO DE COMPETÊNCIA ---
 if not st.session_state.competencia_confirmada:
     st.title(f"Bem-vindo, {st.session_state.usuario_nome}! 👋")
     st.subheader(f"📍 Unidade Gestora: {st.session_state.usuario_cidade}")
@@ -59,13 +62,15 @@ if not st.session_state.competencia_confirmada:
     with st.container(border=True):
         st.markdown("### Selecione o período de trabalho:")
         c1, c2 = st.columns(2)
-        meses_lista = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-        anos_lista =
         
-        mes_escolhido = c1.selectbox("Mês de Referência", meses_lista)
-        ano_escolhido = c2.selectbox("Ano", anos_lista, index=1)
+        # Listas conferidas - sem erros de vírgula
+        meses_opcoes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        anos_opcoes =
         
-        if st.button("🚀 Confirmar e Abrir Lançamentos", use_container_width=True):
+        mes_escolhido = c1.selectbox("Mês de Referência", meses_opcoes)
+        ano_escolhido = c2.selectbox("Ano", anos_opcoes, index=2) # Padrão 2026
+        
+        if st.button("🚀 Confirmar Competência", use_container_width=True):
             st.session_state.mes_ativo = mes_escolhido
             st.session_state.ano_ativo = ano_escolhido
             st.session_state.competencia_confirmada = True
@@ -74,9 +79,9 @@ if not st.session_state.competencia_confirmada:
 
 # --- TELA 03: PAINEL PRINCIPAL ---
 st.sidebar.title(f"📍 {st.session_state.usuario_cidade}")
-st.sidebar.info(f"📅 **Competência:** {st.session_state.mes_ativo}/{st.session_state.ano_ativo}")
+st.sidebar.info(f"📅 **Mês:** {st.session_state.mes_ativo}/{st.session_state.ano_ativo}")
 
-if st.sidebar.button("🔄 Alterar Competência"):
+if st.sidebar.button("🔄 Alterar Mês/Ano"):
     st.session_state.competencia_confirmada = False
     st.rerun()
 
@@ -85,63 +90,63 @@ if st.sidebar.button("🚪 Sair"):
     st.session_state.competencia_confirmada = False
     st.rerun()
 
-# Carregar Dados das Abas
+# Carregar Regras e Centros
 df_conf = carregar_aba("Configuracoes")
 df_cad = carregar_aba("Cadastros_Fixos")
 
-# Filtrar alíquotas da cidade do usuário
+# Puxar Alíquotas Reais da Cidade
 aliq_serv, aliq_patr_total, lei_ref = 0.11, 0.22, "Não cadastrada"
 if not df_conf.empty:
     conf_cid = df_conf[df_conf['Cidade'] == st.session_state.usuario_cidade]
     if not conf_cid.empty:
-        linha_ref = conf_cid.iloc[-1]
-        aliq_serv = float(linha_ref['Al_Servidor']) / 100
-        aliq_patr_total = (float(linha_ref['Al_Patronal']) + float(linha_ref['Al_Suplementar'])) / 100
-        lei_ref = linha_ref['Lei_Referencia']
+        ref = conf_cid.iloc[-1]
+        aliq_serv = float(ref['Al_Servidor']) / 100
+        aliq_patr_total = (float(ref['Al_Patronal']) + float(ref['Al_Suplementar'])) / 100
+        lei_ref = ref['Lei_Referencia']
 
+# Layout Lado a Lado
 col_form, col_hist = st.columns([1, 1.2])
 
 with col_form:
-    st.subheader("📝 Lançamento Mensal")
+    st.subheader("📝 Lançamento")
     with st.container(border=True):
-        # Lógica de Centro de Custo e Secretaria
         df_cid_cad = df_cad[df_cad['Cidade'] == st.session_state.usuario_cidade] if not df_cad.empty else pd.DataFrame()
-        centros_lista = [""] + df_cid_cad['Nome_Centro'].tolist() if not df_cid_cad.empty else [""]
+        centros = [""] + df_cid_cad['Nome_Centro'].tolist() if not df_cid_cad.empty else [""]
         
-        centro = st.selectbox("1. Centro de Custo", centros_lista)
+        centro_sel = st.selectbox("1. Centro de Custo", centros)
         
-        if centro != "":
-            sec_vinculada = df_cid_cad[df_cid_cad['Nome_Centro'] == centro]['Secretaria'].values
+        if centro_sel != "":
+            sec_vinculada = df_cid_cad[df_cid_cad['Nome_Centro'] == centro_sel]['Secretaria'].values
             st.text_input("2. Secretaria", value=sec_vinculada, disabled=True)
         else:
             st.text_input("2. Secretaria", value="", disabled=True)
-            if st.button("➕ Novo Centro/Secretaria"):
-                st.info("Funcionalidade de cadastro em breve.")
+            if st.button("➕ Novo Centro"):
+                st.info("Cadastro em breve.")
 
         st.divider()
-        v_bruto = st.number_input("3. Valor Bruto (R$)", min_value=0.0, step=0.01, format="%.2f", key="v_bruto")
-        v_base = st.number_input("4. Base Cálculo (R$)", min_value=0.0, step=0.01, format="%.2f", key="v_base")
+        v_bruto = st.number_input("3. Valor Bruto (R$)", min_value=0.0, step=0.01, format="%.2f", key="bruto")
+        v_base = st.number_input("4. Base Cálculo (R$)", min_value=0.0, step=0.01, format="%.2f", key="base")
         
-        # Display de Cálculo em destaque
+        # Display de Cálculo
         st.markdown(f"""
         <div style="background-color:#e8f4f8; padding:15px; border-radius:10px; border-left: 5px solid #007bff;">
-            <p style="margin:0; font-size:14px;">⚖️ <b>Valores Devidos (Lei: {lei_ref}):</b></p>
+            <p style="margin:0; font-size:14px;">⚖️ <b>Devido (Lei: {lei_ref}):</b></p>
             <h4 style="margin:5px 0;">Servidor: R$ {v_base * aliq_serv:,.2f}</h4>
             <h4 style="margin:5px 0;">Patronal: R$ {v_base * aliq_patr_total:,.2f}</h4>
         </div>
         """, unsafe_allow_html=True)
 
         st.divider()
-        r_serv = st.number_input("V. Repassado Servidor", min_value=0.0, step=0.01, format="%.2f", key="r_serv")
+        r_serv = st.number_input("V. Repassado Servidor", min_value=0.0, step=0.01, format="%.2f", key="rs")
         dt_serv = st.date_input("Data Repasse Servidor", format="DD/MM/YYYY") if r_serv > 0 else None
         
-        r_patr = st.number_input("V. Repassado Patronal", min_value=0.0, step=0.01, format="%.2f", key="r_patr")
+        r_patr = st.number_input("V. Repassado Patronal", min_value=0.0, step=0.01, format="%.2f", key="rp")
         dt_patr = st.date_input("Data Repasse Patronal", format="DD/MM/YYYY") if r_patr > 0 else None
 
-    if st.button("💾 SALVAR LANÇAMENTO", use_container_width=True, type="primary"):
-        st.success("Lançamento processado!")
+    if st.button("💾 SALVAR", use_container_width=True, type="primary"):
+        st.success("Processado!")
 
 with col_hist:
-    st.button("🟦 FINALIZAR E ENVIAR MÊS", use_container_width=True)
-    st.subheader(f"📋 Conferência: {st.session_state.mes_ativo}")
-    st.info("Aqui aparecerá o histórico de lançamentos salvos.")
+    st.button("🟦 FINALIZAR MÊS", use_container_width=True)
+    st.subheader(f"📋 Histórico: {st.session_state.mes_ativo}")
+    st.info("Aguardando gravação de dados...")
