@@ -211,7 +211,16 @@ with col_form:
         df_cid_cad = df_cad[df_cad['Cidade'] == st.session_state.usuario_cidade] if not df_cad.empty else pd.DataFrame()
         centros = [""] + df_cid_cad['Nome_Centro'].tolist() if not df_cad.empty else [""]
 
-        centro_sel = st.selectbox("1. Centro de Custo", centros)
+        centro_sel = st.selectbox(
+    "1. Centro de Custo",
+    centros,
+    key="centro_principal"
+)
+
+novo_centro = st.text_input("➕ Ou digite um novo centro de custo")
+
+if novo_centro:
+    centro_sel = novo_centro
 
         if centro_sel != "":
             filtro_sec = df_cid_cad[df_cid_cad['Nome_Centro'] == centro_sel]['Secretaria']
