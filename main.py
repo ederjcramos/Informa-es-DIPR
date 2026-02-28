@@ -14,8 +14,33 @@ url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4I
 @st.cache_data(ttl=300)
 def carregar_aba(nome_aba):
     try:
-        return conn.read(spreadsheet=url_planilha, worksheet=nome_aba)
-    except Exception:
+        df = conn.read(spreadsheet=url_planilha, worksheet=nome_aba)
+
+        # Se não carregou nada
+        if df is None or df.empty:
+            return pd.DataFrame()
+
+        # Remove espaços invisíveis nos nomes das colunas
+        df.columns = df.columns.str.strip()
+
+        # Padroniza nomes das colunas automaticamente
+        df.columns = df.columns.str.replace(" ", "")
+        df.columns = df.columns.str.replace("-", "")
+        df.columns = df.columns.str.lower()
+
+        # Renomeia para padrão interno do sistema
+        df = df.rename(columns={
+            "email": "Email",
+            "senha": "Senha",
+            "nome": "Nome",
+            "cpf": "CPF",
+            "cidade": "Cidade"
+        })
+
+        return df
+
+    except Exception as e:
+        st.error(f"Erro ao carregar planilha: {e}")
         return pd.DataFrame()
 
 # --- SEGURANÇA SENHA ---
