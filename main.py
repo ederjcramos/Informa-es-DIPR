@@ -15,13 +15,10 @@ url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4I
 def carregar_aba(nome_aba):
     try:
         df = conn.read(spreadsheet=url_planilha, worksheet=nome_aba)
-
         if df is None or df.empty:
             return pd.DataFrame()
-
         df.columns = df.columns.str.strip()
         return df
-
     except Exception as e:
         st.error(f"Erro ao carregar aba '{nome_aba}': {e}")
         return pd.DataFrame()
@@ -43,6 +40,9 @@ def moeda_para_float(valor):
     except:
         return 0.0
 
+
+def formatar_real(v):
+    return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # ---------------- SESSION STATE ----------------
 if "logado" not in st.session_state:
@@ -74,7 +74,6 @@ if not st.session_state.logado:
             colunas = ["Email", "Senha", "Nome", "CPF", "Cidade"]
             if not all(c in df_user.columns for c in colunas):
                 st.error("❌ Estrutura inválida da aba Base_Usuários")
-                st.write(df_user.columns)
                 st.stop()
 
             user_match = df_user[df_user["Email"].str.lower() == u_email.lower()]
@@ -144,7 +143,6 @@ aliq_serv, aliq_patr_total, lei_ref = 0.0, 0.0, "Não cadastrada"
 
 if not df_conf.empty:
     conf = df_conf[df_conf["Cidade"] == st.session_state.usuario_cidade]
-
     if not conf.empty:
         ref = conf.iloc[-1]
         aliq_serv = float(ref["Al_Servidor"]) / 100
@@ -181,12 +179,27 @@ with col_form:
 
         st.divider()
 
-        # ---------- VALORES ----------
-        v_bruto_txt = st.text_input("3. Valor Bruto da Folha (R$)", placeholder="0,00")
-        v_base_txt = st.text_input("4. Base de Contribuição (R$)", placeholder="0,00")
+        # ---------- VALORES COM ESTADO ----------
+        if "valor_bruto" not in st.session_state:
+            st.session_state.valor_bruto = ""
 
-        v_bruto = moeda_para_float(v_bruto_txt)
-        v_base = moeda_para_float(v_base_txt)
+        if "valor_base" not in st.session_state:
+            st.session_state.valor_base = ""
+
+        st.text_input(
+            "3. Valor Bruto da Folha (R$)",
+            key="valor_bruto",
+            placeholder="Ex: 15000,00"
+        )
+
+        st.text_input(
+            "4. Base de Contribuição (R$)",
+            key="valor_base",
+            placeholder="Ex: 12000,00"
+        )
+
+        v_bruto = moeda_para_float(st.session_state.valor_bruto)
+        v_base = moeda_para_float(st.session_state.valor_base)
 
         valor_devido_servidor = v_base * aliq_serv
         valor_devido_patronal = v_base * aliq_patr_total
@@ -194,9 +207,9 @@ with col_form:
         # ---------- MEMÓRIA DE CÁLCULO ----------
         st.markdown(f"""
         <div style="background-color:#e8f4f8;padding:15px;border-radius:10px;border-left:5px solid #007bff;">
-        <b>Lei:</b> {lei_ref}<br>
-        Servidor devido: R$ {valor_devido_servidor:,.2f}<br>
-        Patronal devido: R$ {valor_devido_patronal:,.2f}
+        <b>Lei:</b> {lei_ref}<br><br>
+        <b>Servidor devido:</b> R$ {formatar_real(valor_devido_servidor)}<br>
+        <b>Patronal devido:</b> R$ {formatar_real(valor_devido_patronal)}
         </div>
         """, unsafe_allow_html=True)
 
@@ -207,14 +220,14 @@ with col_form:
         houve_pag_serv = st.checkbox("Houve pagamento do Servidor?")
         if houve_pag_serv:
             r_serv = moeda_para_float(st.text_input("Valor Repassado Servidor"))
-            dt_serv = st.date_input("Data Repasse Servidor")
+            dt_serv = st.date_input("Data Repasse Servidor", format="DD/MM/YYYY")
         else:
             r_serv, dt_serv = 0, None
 
         houve_pag_patr = st.checkbox("Houve pagamento Patronal?")
         if houve_pag_patr:
             r_patr = moeda_para_float(st.text_input("Valor Repassado Patronal"))
-            dt_patr = st.date_input("Data Repasse Patronal")
+            dt_patr = st.date_input("Data Repasse Patronal", format="DD/MM/YYYY")
         else:
             r_patr, dt_patr = 0, None
 
@@ -222,12 +235,12 @@ with col_form:
         if houve_pag_serv:
             dif_serv = valor_devido_servidor - r_serv
             if abs(dif_serv) > 0.01:
-                st.warning(f"⚠ Diferença Servidor: R$ {dif_serv:,.2f}")
+                st.warning(f"⚠ Diferença Servidor: R$ {formatar_real(dif_serv)}")
 
         if houve_pag_patr:
             dif_patr = valor_devido_patronal - r_patr
             if abs(dif_patr) > 0.01:
-                st.warning(f"⚠ Diferença Patronal: R$ {dif_patr:,.2f}")
+                st.warning(f"⚠ Diferença Patronal: R$ {formatar_real(dif_patr)}")
 
     if st.button("💾 SALVAR LANÇAMENTO", use_container_width=True, type="primary"):
         st.success("Lançamento registrado (em breve salvará na planilha).")
