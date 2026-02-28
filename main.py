@@ -184,7 +184,9 @@ if st.sidebar.button("🚪 Sair"):
     st.rerun()
 
 # Carregar dados
-df_conf = carregar_aba("Configuracoes")
+df_conf = carregar_aba("Configuracoes") 
+st.write("Teste Configuracoes:", df_conf)
+
 df_cad = carregar_aba("Cadastros_Fixos")
 
 aliq_serv, aliq_patr_total, lei_ref = 0.11, 0.22, "Não cadastrada"
