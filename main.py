@@ -7,7 +7,7 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="SISTEMA DIPR 2026", layout="wide")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
-url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4IqA5itXB0G-MRB35aGGU/edit?gid=1415303845#gid=1415303845"
+url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4IqA5itXB0G-MRB35aGGU/edit?gid=0#gid=0"
 
 # ---------------- FUNÇÕES ----------------
 
@@ -19,21 +19,7 @@ def carregar_aba(nome_aba):
         if df is None or df.empty:
             return pd.DataFrame()
 
-        # limpar nomes das colunas
         df.columns = df.columns.str.strip()
-        df.columns = df.columns.str.replace(" ", "")
-        df.columns = df.columns.str.replace("-", "")
-        df.columns = df.columns.str.lower()
-
-        # padronizar nomes internos
-        df = df.rename(columns={
-            "email": "Email",
-            "senha": "Senha",
-            "nome": "Nome",
-            "cpf": "CPF",
-            "cidade": "Cidade"
-        })
-
         return df
 
     except Exception as e:
@@ -43,10 +29,7 @@ def carregar_aba(nome_aba):
 
 def verificar_senha(senha_digitada, hash_salvo):
     try:
-        return bcrypt.checkpw(
-            senha_digitada.encode(),
-            hash_salvo.encode()
-        )
+        return bcrypt.checkpw(senha_digitada.encode(), hash_salvo.encode())
     except:
         return False
 
@@ -88,11 +71,10 @@ if not st.session_state.logado:
 
             df_user = carregar_aba("Base_Usuários")
 
-            colunas_necessarias = ["Email", "Senha", "Nome", "CPF", "Cidade"]
-
-            if not all(col in df_user.columns for col in colunas_necessarias):
-                st.error("❌ Estrutura da planilha Base_Usuários inválida.")
-                st.write("Colunas encontradas:", df_user.columns.tolist())
+            colunas = ["Email", "Senha", "Nome", "CPF", "Cidade"]
+            if not all(c in df_user.columns for c in colunas):
+                st.error("❌ Estrutura inválida da aba Base_Usuários")
+                st.write(df_user.columns)
                 st.stop()
 
             user_match = df_user[df_user["Email"].str.lower() == u_email.lower()]
@@ -109,65 +91,62 @@ if not st.session_state.logado:
                     st.rerun()
 
             st.session_state.tentativas_login += 1
-            restantes = 5 - st.session_state.tentativas_login
-            st.error(f"Dados incorretos. Tentativas restantes: {restantes}")
+            st.error(f"Dados incorretos. Tentativas restantes: {5 - st.session_state.tentativas_login}")
 
     st.stop()
 
-# ---------------- SELEÇÃO COMPETÊNCIA ----------------
+# ---------------- COMPETÊNCIA ----------------
 if not st.session_state.competencia_confirmada:
 
     st.title(f"Bem-vindo, {st.session_state.usuario_nome} 👋")
     st.subheader(f"📍 Unidade: {st.session_state.usuario_cidade}")
 
     with st.container(border=True):
-        st.markdown("### 📅 Selecione a competência para preenchimento:")
+        st.markdown("### 📅 Selecione a competência para preenchimento")
 
         c1, c2 = st.columns(2)
 
-        lista_meses = [
+        meses = [
             "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
             "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
         ]
+        anos = [2024, 2025, 2026, 2027]
 
-        lista_anos = [2024, 2025, 2026, 2027]
+        mes = c1.selectbox("Mês", meses)
+        ano = c2.selectbox("Ano", anos, index=2)
 
-        mes_escolhido = c1.selectbox("Mês", lista_meses)
-        ano_escolhido = c2.selectbox("Ano", lista_anos, index=2)
-
-        if st.button("🚀 Confirmar Competência", use_container_width=True):
-            st.session_state.mes_ativo = mes_escolhido
-            st.session_state.ano_ativo = ano_escolhido
+        if st.button("Confirmar Competência", use_container_width=True):
+            st.session_state.mes_ativo = mes
+            st.session_state.ano_ativo = ano
             st.session_state.competencia_confirmada = True
             st.rerun()
 
     st.stop()
 
 # ---------------- SIDEBAR ----------------
-st.sidebar.title(f"📍 {st.session_state.usuario_cidade}")
-st.sidebar.info(
-    f"📅 **Competência:** {st.session_state.mes_ativo}/{st.session_state.ano_ativo}"
-)
+st.sidebar.title(st.session_state.usuario_cidade)
+st.sidebar.info(f"Competência: {st.session_state.mes_ativo}/{st.session_state.ano_ativo}")
 
-if st.sidebar.button("🔄 Alterar Competência"):
+if st.sidebar.button("Alterar Competência"):
     st.session_state.competencia_confirmada = False
     st.rerun()
 
-if st.sidebar.button("🚪 Sair"):
+if st.sidebar.button("Sair"):
     st.session_state.logado = False
     st.session_state.competencia_confirmada = False
     st.rerun()
 
-# ---------------- CARREGAR CONFIGURAÇÕES ----------------
+# ---------------- CONFIGURAÇÕES ----------------
 df_conf = carregar_aba("Configuracoes")
 df_cad = carregar_aba("Cadastros_Fixos")
 
-aliq_serv, aliq_patr_total, lei_ref = 0.11, 0.22, "Não cadastrada"
+aliq_serv, aliq_patr_total, lei_ref = 0.0, 0.0, "Não cadastrada"
 
-if not df_conf.empty and "Cidade" in df_conf.columns:
-    conf_cid = df_conf[df_conf["Cidade"] == st.session_state.usuario_cidade]
-    if not conf_cid.empty:
-        ref = conf_cid.iloc[-1]
+if not df_conf.empty:
+    conf = df_conf[df_conf["Cidade"] == st.session_state.usuario_cidade]
+
+    if not conf.empty:
+        ref = conf.iloc[-1]
         aliq_serv = float(ref["Al_Servidor"]) / 100
         aliq_patr_total = (float(ref["Al_Patronal"]) + float(ref["Al_Suplementar"])) / 100
         lei_ref = ref["Lei_Referencia"]
@@ -181,45 +160,79 @@ with col_form:
 
     with st.container(border=True):
 
-        df_cid_cad = (
-            df_cad[df_cad["Cidade"] == st.session_state.usuario_cidade]
-            if not df_cad.empty and "Cidade" in df_cad.columns
-            else pd.DataFrame()
-        )
-
+        # ---------- CENTRO DE CUSTO ----------
+        df_cid_cad = df_cad[df_cad["Cidade"] == st.session_state.usuario_cidade] if not df_cad.empty else pd.DataFrame()
         centros = [""] + df_cid_cad["Nome_Centro"].tolist() if not df_cid_cad.empty else [""]
 
         centro_sel = st.selectbox("1. Centro de Custo", centros)
-
-        novo_centro = st.text_input("➕ Ou digite um novo centro de custo")
+        novo_centro = st.text_input("➕ Ou digite novo centro")
 
         if novo_centro:
             centro_sel = novo_centro
 
-        st.text_input("Centro selecionado", value=centro_sel, disabled=True)
+        # ---------- SECRETARIA AUTOMÁTICA ----------
+        if centro_sel and not df_cid_cad.empty:
+            filtro = df_cid_cad[df_cid_cad["Nome_Centro"] == centro_sel]
+            secretaria = filtro.iloc[0]["Secretaria"] if not filtro.empty else ""
+        else:
+            secretaria = ""
+
+        st.text_input("2. Secretaria", value=secretaria, disabled=True)
 
         st.divider()
 
-        v_bruto_txt = st.text_input("3. Valor Bruto (R$)", placeholder="0,00")
+        # ---------- VALORES ----------
+        v_bruto_txt = st.text_input("3. Valor Bruto da Folha (R$)", placeholder="0,00")
         v_base_txt = st.text_input("4. Base de Contribuição (R$)", placeholder="0,00")
 
         v_bruto = moeda_para_float(v_bruto_txt)
         v_base = moeda_para_float(v_base_txt)
 
+        valor_devido_servidor = v_base * aliq_serv
+        valor_devido_patronal = v_base * aliq_patr_total
+
+        # ---------- MEMÓRIA DE CÁLCULO ----------
         st.markdown(f"""
-        <div style="background-color:#e8f4f8; padding:15px; border-radius:10px; border-left:5px solid #007bff;">
-            <p>⚖️ <b>Devido (Lei: {lei_ref})</b></p>
-            <h4>Servidor: R$ {v_base * aliq_serv:,.2f}</h4>
-            <h4>Patronal: R$ {v_base * aliq_patr_total:,.2f}</h4>
+        <div style="background-color:#e8f4f8;padding:15px;border-radius:10px;border-left:5px solid #007bff;">
+        <b>Lei:</b> {lei_ref}<br>
+        Servidor devido: R$ {valor_devido_servidor:,.2f}<br>
+        Patronal devido: R$ {valor_devido_patronal:,.2f}
         </div>
         """, unsafe_allow_html=True)
 
+        # ---------- REPASSES ----------
+        st.divider()
+        st.subheader("Verificação de Repasse")
+
+        houve_pag_serv = st.checkbox("Houve pagamento do Servidor?")
+        if houve_pag_serv:
+            r_serv = moeda_para_float(st.text_input("Valor Repassado Servidor"))
+            dt_serv = st.date_input("Data Repasse Servidor")
+        else:
+            r_serv, dt_serv = 0, None
+
+        houve_pag_patr = st.checkbox("Houve pagamento Patronal?")
+        if houve_pag_patr:
+            r_patr = moeda_para_float(st.text_input("Valor Repassado Patronal"))
+            dt_patr = st.date_input("Data Repasse Patronal")
+        else:
+            r_patr, dt_patr = 0, None
+
+        # ---------- DIFERENÇAS ----------
+        if houve_pag_serv:
+            dif_serv = valor_devido_servidor - r_serv
+            if abs(dif_serv) > 0.01:
+                st.warning(f"⚠ Diferença Servidor: R$ {dif_serv:,.2f}")
+
+        if houve_pag_patr:
+            dif_patr = valor_devido_patronal - r_patr
+            if abs(dif_patr) > 0.01:
+                st.warning(f"⚠ Diferença Patronal: R$ {dif_patr:,.2f}")
+
     if st.button("💾 SALVAR LANÇAMENTO", use_container_width=True, type="primary"):
-        st.success("Lançamento processado!")
+        st.success("Lançamento registrado (em breve salvará na planilha).")
 
 with col_hist:
-    st.button("🟦 FINALIZAR E ENVIAR MÊS", use_container_width=True)
-    st.subheader(f"📋 Conferência: {st.session_state.mes_ativo}")
+    st.button("FINALIZAR E ENVIAR MÊS", use_container_width=True)
+    st.subheader(f"Conferência: {st.session_state.mes_ativo}")
     st.info("O histórico aparecerá aqui.")
-
-  
