@@ -8,7 +8,7 @@ st.set_page_config(page_title="SISTEMA DIPR 2026", layout="wide")
 
 # Conexão com Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
-url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4IqA5itXB0G-MRB35aGGU/edit?gid=0#gid=0"
+url_planilha = "https://docs.google.com/spreadsheets/d/1g0Vafzks-zgn7HcJkzwnwB4IqA5itXB0G-MRB35aGGU/edit?gid=1216958417#gid=1216958417"
 
 # --- FUNÇÕES DE APOIO ---
 @st.cache_data(ttl=300)
@@ -42,24 +42,25 @@ if 'bloqueado' not in st.session_state:
     st.session_state.bloqueado = False
 
 
-# --- TELA 01: LOGIN ---
+# =============================
+# TELA 01 — LOGIN
+# =============================
 if not st.session_state.logado:
 
     st.title("🔐 Acesso ao Sistema DIPR")
 
-    # BLOQUEIO DE ACESSO
     if st.session_state.bloqueado:
         st.error("""
         🚫 **Acesso bloqueado por excesso de tentativas.**
-        
+
         Por favor, contate o responsável pelo sistema para liberação do acesso.
         """)
         st.stop()
 
     with st.form("login_form"):
+
         u_email = st.text_input("E-mail Institucional").strip()
         u_senha = st.text_input("Senha", type="password")
-        u_cpf = st.text_input("CPF (Apenas números)").strip()
 
         if st.form_submit_button("Entrar no Sistema"):
 
@@ -67,12 +68,9 @@ if not st.session_state.logado:
 
             if not df_user.empty:
 
-                u_cpf_limpo = u_cpf.replace('.', '').replace('-', '')
-
-                # busca usuário por email + cpf
+                # procura usuário só por email
                 user_match = df_user[
-                    (df_user['Email'].str.lower() == u_email.lower()) &
-                    (df_user['CPF'].astype(str).str.replace(r'\D', '', regex=True) == u_cpf_limpo)
+                    df_user['Email'].str.lower() == u_email.lower()
                 ]
 
                 if not user_match.empty:
@@ -85,8 +83,9 @@ if not st.session_state.logado:
                         st.session_state.logado = True
                         st.session_state.tentativas_login = 0
 
+                        st.session_state.usuario_nome = user_match.iloc[0]['Nome']
+                        st.session_state.usuario_cpf = user_match.iloc[0]['CPF']
                         st.session_state.usuario_cidade = user_match.iloc[0]['Cidade']
-                        st.session_state.usuario_nome = u_email.split('@')[0].capitalize()
 
                         st.rerun()
 
@@ -97,7 +96,9 @@ if not st.session_state.logado:
                             st.session_state.bloqueado = True
                             st.rerun()
 
-                        st.error(f"⚠️ Senha incorreta. Tentativas restantes: {5 - st.session_state.tentativas_login}")
+                        st.error(
+                            f"⚠️ Senha incorreta. Tentativas restantes: {5 - st.session_state.tentativas_login}"
+                        )
 
                 else:
                     st.error("⚠️ Usuário não encontrado.")
@@ -108,19 +109,22 @@ if not st.session_state.logado:
     st.stop()
 
 
-# --- TELA 02: SELEÇÃO DE COMPETÊNCIA ---
+# =============================
+# TELA 02 — COMPETÊNCIA
+# =============================
 if not st.session_state.competencia_confirmada:
 
     st.title(f"Bem-vindo, {st.session_state.usuario_nome}! 👋")
     st.subheader(f"📍 Unidade: {st.session_state.usuario_cidade}")
 
     with st.container(border=True):
+
         st.markdown("### Selecione o período de trabalho:")
         c1, c2 = st.columns(2)
 
         lista_meses = [
-            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+            "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+            "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
         ]
 
         lista_anos = [2024, 2025, 2026, 2027]
@@ -137,9 +141,13 @@ if not st.session_state.competencia_confirmada:
     st.stop()
 
 
-# --- TELA 03: PAINEL PRINCIPAL ---
+# =============================
+# TELA 03 — PAINEL
+# =============================
 st.sidebar.title(f"📍 {st.session_state.usuario_cidade}")
-st.sidebar.info(f"📅 **Mês Ativo:** {st.session_state.mes_ativo}/{st.session_state.ano_ativo}")
+st.sidebar.info(
+    f"👤 {st.session_state.usuario_nome}\n\n📅 {st.session_state.mes_ativo}/{st.session_state.ano_ativo}"
+)
 
 if st.sidebar.button("🔄 Alterar Competência"):
     st.session_state.competencia_confirmada = False
@@ -150,7 +158,7 @@ if st.sidebar.button("🚪 Sair"):
     st.session_state.competencia_confirmada = False
     st.rerun()
 
-# Carregar Dados
+# Carregar dados
 df_conf = carregar_aba("Configuracoes")
 df_cad = carregar_aba("Cadastros_Fixos")
 
@@ -161,7 +169,9 @@ if not df_conf.empty:
     if not conf_cid.empty:
         ref = conf_cid.iloc[-1]
         aliq_serv = float(ref['Al_Servidor']) / 100
-        aliq_patr_total = (float(ref['Al_Patronal']) + float(ref['Al_Suplementar'])) / 100
+        aliq_patr_total = (
+            float(ref['Al_Patronal']) + float(ref['Al_Suplementar'])
+        ) / 100
         lei_ref = ref['Lei_Referencia']
 
 col_form, col_hist = st.columns([1, 1.2])
@@ -190,9 +200,9 @@ with col_form:
 
         st.markdown(f"""
         <div style="background-color:#e8f4f8; padding:15px; border-radius:10px; border-left: 5px solid #007bff;">
-            <p style="margin:0; font-size:14px;">⚖️ <b>Devido (Lei: {lei_ref}):</b></p>
-            <h4 style="margin:5px 0;">Servidor: R$ {v_base * aliq_serv:,.2f}</h4>
-            <h4 style="margin:5px 0;">Patronal: R$ {v_base * aliq_patr_total:,.2f}</h4>
+            <p style="margin:0;">⚖️ <b>Devido (Lei: {lei_ref}):</b></p>
+            <h4>Servidor: R$ {v_base * aliq_serv:,.2f}</h4>
+            <h4>Patronal: R$ {v_base * aliq_patr_total:,.2f}</h4>
         </div>
         """, unsafe_allow_html=True)
 
